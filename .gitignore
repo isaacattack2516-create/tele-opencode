@@ -4,6 +4,7 @@ state.json
 
 # Runtime data / logs
 activity.jsonl
+logs/
 __pycache__/
 *.pyc
 

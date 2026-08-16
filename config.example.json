@@ -1,29 +1,38 @@
 {
   "bot_token": "PASTE_YOUR_TELEGRAM_BOT_TOKEN_HERE",
   "owner_id": null,
+  "repo_url": "https://github.com/OWNER/tele-opencode.git",
+  "github_token": "PASTE_FINE_GRAINED_READ_ONLY_PAT",
+  "git_branch": "main",
   "devices": {
-    "linux": {
+    "mac": {
       "url": "http://127.0.0.1:19123",
       "username": "opencode",
-      "password": "PASTE_LINUX_SERVER_PASSWORD",
-      "directory": "/path/to/your/project",
+      "password": "PASTE_MAC_SERVER_PASSWORD",
+      "directory": "~/",
+      "is_hub": true,
+      "repo_dir": "/absolute/path/to/tele-opencode/on/mac",
       "model": {
         "providerID": "opencode",
         "modelID": "deepseek-v4-flash-free"
       }
     },
-    "mac": {
-      "url": "http://MAC_IP_OR_TUNNEL_HOST:19124",
+    "linux": {
+      "url": "http://LINUX_IP:19124",
       "username": "opencode",
-      "password": "PASTE_MAC_SERVER_PASSWORD",
-      "directory": "~/",
+      "password": "PASTE_LINUX_SERVER_PASSWORD",
+      "directory": "/home/yourname",
+      "is_hub": false,
+      "repo_dir": "/home/yourname/tele-opencode",
       "model": null
     },
     "windows": {
-      "url": "http://WINDOWS_IP_OR_TUNNEL_HOST:19124",
+      "url": "http://WINDOWS_IP:19124",
       "username": "opencode",
       "password": "PASTE_WINDOWS_SERVER_PASSWORD",
       "directory": "C:/Users/yourname",
+      "is_hub": false,
+      "repo_dir": "C:/Users/yourname/tele-opencode",
       "model": null
     }
   }

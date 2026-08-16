@@ -15,6 +15,7 @@ Latency optimizations:
 
 import json
 import re
+import subprocess
 import sys
 import threading
 import time
@@ -23,7 +24,9 @@ import urllib.request
 from pathlib import Path
 
 import eventlog
+import version as version_mod
 
+BOT_VERSION = version_mod.VERSION
 BASE_DIR = Path(__file__).resolve().parent
 CONFIG_PATH = BASE_DIR / "config.json"
 STATE_PATH = BASE_DIR / "state.json"
@@ -120,6 +123,8 @@ class Device:
         self.base = cfg["url"].rstrip("/")
         self.directory = cfg.get("directory") or "~"
         self.model = cfg.get("model") or None
+        self.is_hub = bool(cfg.get("is_hub"))
+        self.repo_dir = cfg.get("repo_dir") or ""
         self.rotate_input = int(cfg.get("rotate_input_tokens") or ROTATE_INPUT_TOKENS)
         self.rotate_cache = int(cfg.get("rotate_cache_tokens") or ROTATE_CACHE_TOKENS)
         self.first_token_timeout = float(
@@ -302,6 +307,53 @@ class Device:
         except Exception:
             return False
 
+    def run_shell(self, command, timeout=300):
+        """Run a shell command on this machine through its opencode serve.
+
+        Returns (ok, output). Used by /update to trigger the repo services
+        update on a device. The opencode model is asked to run the command via
+        bash and return its output.
+        """
+        prompt = (
+            "Run the following shell command on this machine exactly as given, "
+            "using the bash tool, then reply with its full output. If it fails, "
+            "include the error.\n\n"
+            f"{command}"
+        )
+        try:
+            session_id, _ = self.ensure_session(None)
+            reply = self.stream_reply(session_id, prompt, first_token_timeout=60)
+            low = reply.lower()
+            ok = not ("[updater] error" in low or low.strip().startswith("error"))
+            return ok, reply
+        except Exception as exc:
+            return False, str(exc)
+
+    def get_version(self, timeout=90):
+        """Best-effort: read this device's running code version via opencode."""
+        if not self.ping():
+            return "unreachable"
+        if not self.repo_dir:
+            return "?"
+        cmd = (
+            f"python3 -c \"import sys; sys.path.insert(0,'{self.repo_dir}'); "
+            f"import version; print(version.VERSION)\""
+        )
+        try:
+            session_id, _ = self.ensure_session(None)
+            reply = self.stream_reply(
+                session_id,
+                "Run this command with bash and reply with ONLY the exact stdout "
+                "(a version number), nothing else: " + cmd,
+                first_token_timeout=60,
+            )
+            line = reply.strip().splitlines()[0] if reply.strip() else "?"
+            if line.lower().startswith("error") or line.startswith("Traceback"):
+                return "?"
+            return line[:20]
+        except Exception:
+            return "?"
+
 
 def extract_reply(data):
     parts = data.get("parts", [])
@@ -409,7 +461,9 @@ def handle_command(token, cfg, state, devices, chat_id, text):
             "/devices - list configured machines and status\n"
             "/set <device> - change default device for this chat\n"
             "/default - show current default\n"
+            "/version - show bot version and per-device code versions\n"
             "/new - start a fresh session (resets context)\n"
+            "/update [devices] - pull latest code from GitHub on every machine\n"
             "/help - this message",
         )
 
@@ -429,7 +483,8 @@ def handle_command(token, cfg, state, devices, chat_id, text):
         for t in threads:
             t.join(timeout=8)
         for name in devices:
-            lines.append(f"- {name}: {results.get(name, 'unknown')}")
+            hub = " (hub)" if devices[name].is_hub else ""
+            lines.append(f"- {name}{hub}: {results.get(name, 'unknown')}")
         lines.append(f"\nDefault: {cfg.get('default_device', 'linux')}")
         return send_text(token, chat_id, "\n".join(lines))
 
@@ -443,6 +498,23 @@ def handle_command(token, cfg, state, devices, chat_id, text):
 
     if text == "/default":
         return send_text(token, chat_id, f"Default: {cfg.get('default_device', 'linux')}")
+
+    if text == "/version":
+        lines = [f"Bot version: {BOT_VERSION}"]
+        results = {}
+
+        def vprobe(name, d):
+            results[name] = d.get_version()
+
+        threads = [threading.Thread(target=vprobe, args=(n, d), daemon=True)
+                   for n, d in devices.items()]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=100)
+        for name in devices:
+            lines.append(f"- {name}: {results.get(name, '?')}")
+        return send_text(token, chat_id, "\n".join(lines))
 
     if text == "/new":
         device_name = cfg.get("default_device", "linux")
@@ -458,6 +530,93 @@ def handle_command(token, cfg, state, devices, chat_id, text):
         except Exception as exc:
             return send_text(token, chat_id, f"[{device_name}] error starting session: {exc}")
 
+    if text.startswith("/update"):
+        return handle_update_cmd(token, cfg, state, devices, chat_id, text)
+
+    return None
+
+
+def handle_update_cmd(token, cfg, state, devices, chat_id, text):
+    """Pull latest code from GitHub on every machine and restart services.
+
+    Non-hub devices are updated first, in parallel, via each machine's
+    opencode serve running the local updater.sh. The hub is updated last, and
+    its updater is launched detached so the bot can reply before the hub (and
+    the bot itself) restart on the new code.
+    """
+    parts = text.split()
+    if len(parts) == 1 or parts[1].lower() in ("all", "*"):
+        targets = list(devices)
+    else:
+        requested = [p.lower().lstrip("/") for p in parts[1:]]
+        targets = [d for d in requested if d in devices]
+        unknown = [d for d in requested if d not in devices]
+        if unknown:
+            send_text(token, chat_id, f"Unknown device(s): {', '.join(unknown)}")
+        if not targets:
+            return send_text(token, chat_id, "No valid devices to update.")
+
+    hub_devices = [name for name in targets if devices[name].is_hub]
+    remote_devices = [name for name in targets if not devices[name].is_hub]
+
+    msg = send_text(
+        token, chat_id,
+        f"Updating {len(remote_devices)} remote + {len(hub_devices)} hub: "
+        + ", ".join(targets),
+    )
+    status_id = msg["result"]["message_id"]
+
+    results = {}
+    if remote_devices:
+        def do_remote(name):
+            dev = devices[name]
+            if not dev.ping():
+                results[name] = ("unreachable", "cannot reach opencode server")
+                return
+            if not dev.repo_dir:
+                results[name] = (
+                    "failed",
+                    "repo_dir not set; configure this device's config.json",
+                )
+                return
+            updater = f"bash '{dev.repo_dir}/updater.sh'"
+            ok, out = dev.run_shell(updater, timeout=300)
+            tail = "\n".join(out.splitlines()[-6:]) if out else ""
+            results[name] = ("ok" if ok else "failed", tail)
+
+        threads = [threading.Thread(target=do_remote, args=(n,), daemon=True)
+                   for n in remote_devices]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=320)
+
+    # Hub last: launch updater detached so it can restart the bot.
+    for name in hub_devices:
+        dev = devices[name]
+        if not dev.repo_dir:
+            results[name] = ("failed", "repo_dir not set for hub")
+            continue
+        try:
+            subprocess.Popen(
+                ["bash", f"{dev.repo_dir}/updater.sh"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+            results[name] = ("ok", "updater launched; bot will restart on new code")
+        except Exception as exc:
+            results[name] = ("failed", str(exc))
+
+    lines = []
+    for name in targets:
+        status, detail = results.get(name, ("unknown", ""))
+        icon = {"ok": "OK", "failed": "FAILED", "unreachable": "UNREACHABLE"}.get(status, status)
+        lines.append(f"- {name}: {icon}")
+        if detail:
+            lines.append(f"    {detail}")
+    edit_text(token, chat_id, status_id, "/update\n" + "\n".join(lines))
+    eventlog.record("update", devices=",".join(targets),
+                    results={n: results.get(n, ("?", ""))[0] for n in targets})
     return None
 
 
