@@ -1,0 +1,11 @@
+# Secrets — never commit these
+config.json
+state.json
+
+# Runtime data / logs
+activity.jsonl
+__pycache__/
+*.pyc
+
+# Local env
+.env

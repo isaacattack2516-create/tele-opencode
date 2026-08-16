@@ -1,0 +1,12 @@
+[Unit]
+Description=OpenCode headless server for Tele-OpenCode
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart="%h/Desktop/tele-opencode/serve.sh"
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

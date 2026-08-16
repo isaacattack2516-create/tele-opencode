@@ -1,0 +1,13 @@
+[Unit]
+Description=Tele-OpenCode Telegram bot
+After=network-online.target tele-opencode-serve.service
+Wants=tele-opencode-serve.service
+
+[Service]
+Type=simple
+ExecStart="%h/Desktop/tele-opencode/run-bot.sh"
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

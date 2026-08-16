@@ -1,0 +1,15 @@
+[Unit]
+Description=Tele-OpenCode Dashboard web UI
+After=network-online.target tele-opencode-bot.service
+Wants=tele-opencode-bot.service
+
+[Service]
+Type=simple
+Environment=DASHBOARD_HOST=127.0.0.1
+Environment=DASHBOARD_PORT=19125
+ExecStart="/home/isaac-ramos/Desktop/tele-opencode/run-dashboard.sh"
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

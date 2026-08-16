@@ -1,0 +1,30 @@
+{
+  "bot_token": "PASTE_YOUR_TELEGRAM_BOT_TOKEN_HERE",
+  "owner_id": null,
+  "devices": {
+    "linux": {
+      "url": "http://127.0.0.1:19123",
+      "username": "opencode",
+      "password": "PASTE_LINUX_SERVER_PASSWORD",
+      "directory": "/path/to/your/project",
+      "model": {
+        "providerID": "opencode",
+        "modelID": "deepseek-v4-flash-free"
+      }
+    },
+    "mac": {
+      "url": "http://MAC_IP_OR_TUNNEL_HOST:19124",
+      "username": "opencode",
+      "password": "PASTE_MAC_SERVER_PASSWORD",
+      "directory": "~/",
+      "model": null
+    },
+    "windows": {
+      "url": "http://WINDOWS_IP_OR_TUNNEL_HOST:19124",
+      "username": "opencode",
+      "password": "PASTE_WINDOWS_SERVER_PASSWORD",
+      "directory": "C:/Users/yourname",
+      "model": null
+    }
+  }
+}
