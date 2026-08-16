@@ -4,15 +4,14 @@ Paste the prompt below into OpenCode on your **Mac**. It clones the Tele-OpenCod
 repo, configures this Mac as the hub (the single machine that runs the bot and
 dashboard and controls every machine), and starts the Mac's local `opencode serve`.
 
-Before you start, gather (from this Linux machine currently under setup):
+Before you use the prompt, gather these values (do NOT paste secrets into a chat
+that others can see; paste them directly on the Mac):
 
-1. The GitHub fine-grained **read-only** PAT for cloning the private repo:
-   - GitHub → Settings → Developer settings → Personal access tokens →
-     Fine-grained tokens → Generate new token
-   - Repository access: "Only select repositories" → `tele-opencode`
-   - Permissions → Contents: **Read-only**
+1. The GitHub **read-only** PAT we're reusing for now (already embedded below):
+   `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`
 2. The repo URL: `https://github.com/isaacattack2516-create/tele-opencode.git`
-3. The Mac's LAN IP and the telegram bot token (same token used everywhere).
+3. The Linux LAN IP and its `opencode serve` password (ask the Linux side).
+4. The shared Telegram bot token and a password you'll assign to the Mac server.
 
 ---
 
@@ -25,41 +24,43 @@ through each machine's headless `opencode serve`. On this Mac you will run the
 bot, the dashboard, and a local `opencode serve`, and you will act as the single
 controller for every machine.
 
-FIRST, copy config.json.example.json to config.json on this machine is NOT yet
+FIRST, copy config.example.json to config.json on this machine if it is NOT yet
 present, and fill in the following exact settings BEFORE doing anything else.
 
 GitHub access (do not commit any token):
 - repo_url = "https://github.com/isaacattack2516-create/tele-opencode.git"
-- github_token = "<PASTE_FINE_GRAINED_READ_ONLY_PAT>"
+- github_token = "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"
 - git_branch = "main"
 
 1. CLONE the repo into a stable local folder, e.g. ~/tele-opencode, using the
    read-only PAT so the private repo can be fetched:
-     git clone "https://x-access-token:<PAT>@github.com/isaacattack2516-create/tele-opencode.git" \
+     git clone "https://x-access-token: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@github.com/isaacattack2516-create/tele-opencode.git" \
        "$HOME/tele-opencode"
 
-2. In that folder, create config.json from config.example.json and set:
-   - bot_token = the shared Telegram bot token
-   - owner_id = leave null (first person to message the bot claims it), or set it
+2. In that folder, create config.json from config.example.json and set the
+   following. For any value marked <ASK>, the human must supply it — prompt the
+   human for it and do NOT invent one:
+   - bot_token = <ASK: shared Telegram bot token>
+   - owner_id = 8398766085   (the known owner; keep this)
    - repo_dir = "/Users/<YOUR_MAC_USERNAME>/tele-opencode"   (the clone path above)
-   - devices.mac (THIS machine):
+   - devices.mac (THIS machine, the hub):
        url  = "http://127.0.0.1:19123"            # local, reachable on this box
        username = "opencode"
-       password = "<generate a strong unique password for the mac serve>"
+       password = <ASK: strong unique password for the mac serve>
        is_hub = true
        repo_dir = "/Users/<YOUR_MAC_USERNAME>/tele-opencode"
        model = { "providerID": "opencode", "modelID": "deepseek-v4-flash-free" }
    - devices.linux (remote):
        url = "http://<LINUX_LAN_IP>:19123"
        username = "opencode"
-       password = "<the password the Linux serve uses>"
+       password = <ASK: the password the Linux serve uses>
        is_hub = false
        repo_dir = "/home/isaac-ramos/Desktop/tele-opencode"  (Linux clone path)
-       directory = "/home/isaac-ramos"
+       directory = "/home/isaac-ramos/Documents/Default Project"
    - devices.windows (remote):
        url = "http://<WINDOWS_LAN_IP>:19124"
        username = "opencode"
-       password = "<the password the Windows serve uses>"
+       password = <ASK: the password the Windows serve uses>
        is_hub = false
        repo_dir = "C:/Users/<USER>/tele-opencode"
        directory = "C:/Users/<USER>"
