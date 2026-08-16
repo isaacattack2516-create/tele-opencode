@@ -7,4 +7,4 @@ PASSWORD="$(python3 -c "import json,sys; d=json.load(open('$DIR/config.json')); 
 
 export OPENCODE_SERVER_USERNAME="opencode"
 export OPENCODE_SERVER_PASSWORD="$PASSWORD"
-exec "$HOME/.opencode/bin/opencode" serve --hostname 127.0.0.1 --port 19123
+exec "$HOME/.opencode/bin/opencode" serve --hostname 0.0.0.0 --port 19123
